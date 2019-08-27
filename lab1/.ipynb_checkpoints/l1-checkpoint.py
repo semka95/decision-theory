@@ -4,23 +4,25 @@ import numpy as np
 import numpy.ma as ma
 import pprint
 
-
 def initProgram(file_name):
     # открыть файл с данными, поместить все данные в переменную raw_data
     with open(file_name) as json_file:
         raw_data = json.load(json_file)
-    pprint.pprint(raw_data)
-
+    
     # подготовка данных
     suppliers = np.array(raw_data['Suppliers'], dtype=int)
     consumers = np.array(raw_data['Consumers'], dtype=int)
     costs = np.array(raw_data['Costs'], dtype=int)
     capacity = np.zeros(costs.shape, dtype=int)
+    
+    print(f'Поставщики: {suppliers}')
+    print(f'Потребители: {consumers}')
+    print(f'Матрица тарифов:\n {costs}')
 
-    # проверка исходных данных на сбалансированность
+    print(f'Проверка исходных данных на сбалансированность:')
     if np.sum(suppliers) != np.sum(consumers):
-        print(
-            f'задача несбалансирована, ∑a = {np.sum(suppliers)}, ∑b = {np.sum(consumers)}')
+        print(f'задача несбалансирована, ∑a = {np.sum(suppliers)}, ∑b = {np.sum(consumers)}')
+        return
     print(f'задача сбалансирована, ∑a=∑b={np.sum(suppliers)}')
 
     return suppliers, consumers, costs, capacity
@@ -41,6 +43,7 @@ def northWest(suppliers, consumers, costs, capacity):
             if supplier == 0:
                 supplier_index += 1
                 continue
+            # проверка "потери" базисной клетки
             if supplier == consumer and supplier_index != len(suppliers)-1 and consumer_index != len(consumers)-1:
                 lost_basis.insert(0, (supplier_index, consumer_index+1))
             # выбираем наименьшее количество товара, которое возможно переместить
@@ -62,7 +65,7 @@ def northWest(suppliers, consumers, costs, capacity):
     # маскируем все нулевые элементы матрицы перевозок
     capacity = ma.array(capacity)
     capacity = ma.masked_equal(capacity, 0)
-    #
+    # удаляем маску на "пропавших" базисных элементах
     for i in lost_basis:
         capacity[i] = ma.nomask
     return capacity, sum
@@ -206,7 +209,7 @@ def potential(costs, mask):
     # предположим, первый элемент матрицы u равен нулю
     u[0] = 0
 
-    # вычисляем массивы u и v
+    # вычисляем потенциалы u и v
     while True:
         i = 0
         j = 0
@@ -243,7 +246,7 @@ def potential(costs, mask):
         i += 1
 
     # вычисляем индексы отрицательных значений матрицы косвенных тарифов
-    costsIndex = tuple(map(tuple, np.transpose(np.where(costs < 0))))
+    costsIndex = tuple(map(tuple, np.transpose(np.where(indCosts < 0))))
 
     return u, v, indCosts, costsIndex
 
@@ -324,22 +327,20 @@ def checkNeighbour(arr, i, j):
 
 
 def main():
-    suppliers, consumers, costs, capacity = initProgram('Problem2.json')
-    northWestCap, northWestSum = northWest(
-        suppliers, consumers, costs, capacity)
-    print(f'стоимость равна {northWestSum}')
-    print(f'оптимальный план:\n {northWestCap}')
-    u, v, inderectCosts, costsIndex = potential(
-        costs, ma.getmask(northWestCap))
-    print(u, v, inderectCosts, costsIndex)
-
-    suppliers, consumers, costs, capacity = initProgram('Problem4.json')
+    suppliers, consumers, costs, capacity = initProgram('data/Problem5.json')
+    northWestCap, northWestSum = northWest(suppliers, consumers, costs, capacity)
+    print(f'Получившийся опорный план:\n{northWestCap}')
+    print(f'Суммарные затраты перевозок: {northWestSum}')
+    
+    suppliers, consumers, costs, capacity = initProgram('data/Problem5.json')
     minElCap, minElSum = minElem(suppliers, consumers, costs, capacity)
-    print(f'стоимость равна {minElSum}')
-    print(f'оптимальный план:\n {minElCap}')
+    print(f'Получившийся опорный план:\n{minElCap}')
+    print(f'Суммарные затраты перевозок: {minElSum}')
+    
+    u, v, inderectCosts, costsIndex = potential(costs, ma.getmask(northWestCap))
+    print(f'Метод северо-западного угла\nПотенциал поставщика u:{u}\nПотенциал потребителя v:{v}\nКосвенные тарифы:\n{inderectCosts}\nПотенциальные клетки для загрузки (с отрицательными косвенными тарифами):{costsIndex}\n')
     u, v, inderectCosts, costsIndex = potential(costs, ma.getmask(minElCap))
-    print(f'u:{u}\n v:{v}\n косвенные тарифы:\n{inderectCosts}\n потенциальные клетки для загрузки (с отрицательными тарифами):{costsIndex}\n')
-    #cyclesMethod(minElCap, costs)
+    print(f'Метод минимального элемента\nПотенциал поставщика u:{u}\nПотенциал потребителя v:{v}\nКосвенные тарифы:\n{inderectCosts}\nПотенциальные клетки для загрузки (с отрицательными косвенными тарифами):{costsIndex}\n')
 
 
 # %%
